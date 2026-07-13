@@ -1,0 +1,10 @@
+.DS_Store
+*.log
+.env
+.env.*
+
+node_modules/
+apps/**/node_modules/
+apps/**/dist/
+apps/**/.cache/
+coverage/

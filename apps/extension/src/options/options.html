@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aloud Options</title>
+    <link rel="stylesheet" href="common.css" />
+</head>
+
+<body>
+    <main class="panel panel-wide">
+        <h1>Aloud Options</h1>
+        <p class="hint">Set API endpoint, API token, and optional S3 target used by the extension.</p>
+
+        <label>
+            API Endpoint
+            <input id="apiEndpoint" type="url" placeholder="https://api.example.com/convert" />
+        </label>
+
+        <label>
+            API Token
+            <input id="apiToken" type="password" placeholder="Token" />
+        </label>
+
+        <label>
+            S3 Location (Optional)
+            <input id="s3Location" type="text" placeholder="s3://bucket/key-prefix" />
+        </label>
+
+        <div class="actions">
+            <button id="saveSettings" type="button" class="primary">Save Settings</button>
+            <button id="resetSettings" type="button" class="ghost">Reset Form</button>
+        </div>
+
+        <p id="status" class="status" aria-live="polite"></p>
+    </main>
+    <script src="options.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aloud</title>
+    <link rel="stylesheet" href="common.css" />
+</head>
+
+<body>
+    <main class="panel">
+        <h1>Aloud</h1>
+        <p class="hint">Extract readable text from this tab and send it to your API.</p>
+
+        <label>
+            API Endpoint
+            <input id="apiEndpoint" type="url" placeholder="https://api.example.com/convert" />
+        </label>
+
+        <label>
+            API Token
+            <input id="apiToken" type="password" placeholder="Token" />
+        </label>
+
+        <label>
+            S3 Location (Optional)
+            <input id="s3Location" type="text" placeholder="s3://bucket/key-prefix" />
+        </label>
+
+        <div class="actions">
+            <button id="saveSettings" type="button">Save</button>
+            <button id="runNow" type="button" class="primary">Run on This Tab</button>
+        </div>
+
+        <div class="actions">
+            <button id="openOptions" type="button" class="ghost">Open Full Options</button>
+        </div>
+
+        <p id="status" class="status" aria-live="polite"></p>
+    </main>
+    <script src="popup.js"></script>
+</body>
+
+</html>

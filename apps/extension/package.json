@@ -1,0 +1,20 @@
+{
+    "name": "aloud-extension",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Manifest V3 extension that extracts readable text and sends it to an API.",
+    "scripts": {
+        "build": "node build.mjs",
+        "watch": "node build.mjs --watch",
+        "typecheck": "tsc --noEmit",
+        "clean": "rm -rf dist"
+    },
+    "dependencies": {
+        "@mozilla/readability": "^0.6.0"
+    },
+    "devDependencies": {
+        "@types/chrome": "^0.1.31",
+        "esbuild": "^0.25.9",
+        "typescript": "^5.9.2"
+    }
+}
