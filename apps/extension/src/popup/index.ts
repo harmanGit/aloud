@@ -1,53 +1,28 @@
-import type { ExtensionSettings, RuntimeRequest, RuntimeResponse } from "../shared/contracts";
-import { getSettings, saveSettings } from "../shared/storage";
+import type { RuntimeRequest, RuntimeResponse, SaveMode } from "../shared/contracts";
+import {
+    applyThemeMode,
+    getSettings,
+    getSystemThemeMode,
+    getThemeMode
+} from "../shared/storage";
 
-const endpointInput = document.getElementById("apiEndpoint") as HTMLInputElement;
-const tokenInput = document.getElementById("apiToken") as HTMLInputElement;
-const s3Input = document.getElementById("s3Location") as HTMLInputElement;
 const statusEl = document.getElementById("status") as HTMLParagraphElement;
-const saveButton = document.getElementById("saveSettings") as HTMLButtonElement;
-const runButton = document.getElementById("runNow") as HTMLButtonElement;
+const saveLocalButton = document.getElementById("saveLocal") as HTMLButtonElement;
+const saveCloudButton = document.getElementById("saveCloud") as HTMLButtonElement;
 const optionsButton = document.getElementById("openOptions") as HTMLButtonElement;
+const cloudActionWrap = document.getElementById("cloudActionWrap") as HTMLSpanElement;
 
 function showStatus(message: string, isError = false): void {
     statusEl.textContent = message;
     statusEl.classList.toggle("error", isError);
 }
 
-function collectSettings(): ExtensionSettings {
-    return {
-        apiEndpoint: endpointInput.value,
-        apiToken: tokenInput.value,
-        s3Location: s3Input.value
-    };
+function setCloudAvailability(hasS3Location: boolean): void {
+    saveCloudButton.disabled = !hasS3Location;
+    cloudActionWrap.classList.toggle("cloud-disabled", !hasS3Location);
 }
 
-async function loadInitialState(): Promise<void> {
-    const settings = await getSettings();
-    endpointInput.value = settings.apiEndpoint;
-    tokenInput.value = settings.apiToken;
-    s3Input.value = settings.s3Location;
-}
-
-saveButton.addEventListener("click", async () => {
-    try {
-        const settings = collectSettings();
-        if (!settings.apiEndpoint) {
-            showStatus("API endpoint is required.", true);
-            return;
-        }
-        if (!settings.apiToken) {
-            showStatus("API token is required.", true);
-            return;
-        }
-        await saveSettings(settings);
-        showStatus("Settings saved.");
-    } catch (error) {
-        showStatus(error instanceof Error ? error.message : "Failed to save settings.", true);
-    }
-});
-
-runButton.addEventListener("click", async () => {
+async function runForMode(mode: SaveMode): Promise<void> {
     try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tab?.id) {
@@ -58,19 +33,37 @@ runButton.addEventListener("click", async () => {
         showStatus("Running...");
         const response = (await chrome.runtime.sendMessage({
             type: "RUN_ACTIVE_TAB",
-            tabId: tab.id
+            tabId: tab.id,
+            mode
         } as RuntimeRequest)) as RuntimeResponse;
 
         showStatus(response.message, !response.ok);
     } catch (error) {
         showStatus(error instanceof Error ? error.message : "Run failed.", true);
     }
+}
+
+saveLocalButton.addEventListener("click", async () => {
+    await runForMode("local");
+});
+
+saveCloudButton.addEventListener("click", async () => {
+    await runForMode("cloud");
 });
 
 optionsButton.addEventListener("click", () => {
     chrome.runtime.openOptionsPage();
 });
 
-loadInitialState().catch((error) => {
+async function init(): Promise<void> {
+    const storedTheme = await getThemeMode();
+    const mode = storedTheme ?? getSystemThemeMode();
+    applyThemeMode(mode);
+
+    const settings = await getSettings();
+    setCloudAvailability(Boolean(settings.s3Location));
+}
+
+init().catch((error) => {
     showStatus(error instanceof Error ? error.message : "Failed to load settings.", true);
 });

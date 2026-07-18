@@ -3,6 +3,7 @@ import type {
     ExtractionResponse,
     RuntimeRequest,
     RuntimeResponse,
+    SaveMode,
     TriggerSource
 } from "../shared/contracts";
 import { getSettings } from "../shared/storage";
@@ -60,20 +61,26 @@ async function downloadBlob(blob: Blob, filename: string): Promise<void> {
     setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 }
 
-async function postToApi(extraction: NonNullable<ExtractionResponse["data"]>): Promise<Response> {
+async function postToApi(
+    extraction: NonNullable<ExtractionResponse["data"]>,
+    mode: SaveMode
+): Promise<Response> {
     const settings = await getSettings();
     if (!settings.apiEndpoint) {
-        throw new Error("Missing API endpoint. Set it in popup or options.");
+        throw new Error("Missing API endpoint. Set it in options.");
     }
     if (!settings.apiToken) {
-        throw new Error("Missing API token. Set it in popup or options.");
+        throw new Error("Missing API token. Set it in options.");
+    }
+    if (mode === "cloud" && !settings.s3Location) {
+        throw new Error("S3 location is required for Save to Cloud. Set it in options.");
     }
 
     const body = {
         title: extraction.title,
         url: extraction.url,
         text: extraction.text,
-        s3Location: settings.s3Location || undefined
+        s3Location: mode === "cloud" ? settings.s3Location : undefined
     };
 
     return fetch(settings.apiEndpoint, {
@@ -134,17 +141,17 @@ async function processApiResponse(tabId: number, title: string, response: Respon
     return "Downloaded MP4 file from binary API response.";
 }
 
-async function runPipeline(tabId: number, source: TriggerSource): Promise<RuntimeResponse> {
+async function runPipeline(tabId: number, source: TriggerSource, mode: SaveMode = "local"): Promise<RuntimeResponse> {
     const extraction = await requestExtraction(tabId);
     if (!extraction.ok || !extraction.data) {
         throw new Error(extraction.error || "Extraction failed.");
     }
 
-    const response = await postToApi(extraction.data);
+    const response = await postToApi(extraction.data, mode);
     const message = await processApiResponse(tabId, extraction.data.title, response);
     return {
         ok: true,
-        message: `[${source}] ${message}`
+        message: `[${source}] [${mode}] ${message}`
     };
 }
 
@@ -169,7 +176,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         return;
     }
     try {
-        await runPipeline(tab.id, "context-menu");
+        await runPipeline(tab.id, "context-menu", "local");
     } catch (error) {
         console.error(error);
     }
@@ -181,7 +188,7 @@ chrome.commands.onCommand.addListener(async (command) => {
     }
     try {
         const tabId = await getActiveTabId();
-        await runPipeline(tabId, "shortcut");
+        await runPipeline(tabId, "shortcut", "local");
     } catch (error) {
         console.error(error);
     }
@@ -195,7 +202,7 @@ chrome.runtime.onMessage.addListener((request: RuntimeRequest, _sender, sendResp
     (async () => {
         try {
             const tabId = request.tabId ?? (await getActiveTabId());
-            const result = await runPipeline(tabId, "popup");
+            const result = await runPipeline(tabId, "popup", request.mode ?? "local");
             sendResponse(result);
         } catch (error) {
             const message = error instanceof Error ? error.message : "Unexpected error";

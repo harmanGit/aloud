@@ -1,9 +1,18 @@
-import type { ExtensionSettings } from "../shared/contracts";
-import { getSettings, saveSettings } from "../shared/storage";
+import type { ExtensionSettings, ThemeMode } from "../shared/contracts";
+import {
+    applyThemeMode,
+    getSettings,
+    getSystemThemeMode,
+    getThemeMode,
+    saveSettings,
+    saveThemeMode
+} from "../shared/storage";
 
 const endpointInput = document.getElementById("apiEndpoint") as HTMLInputElement;
 const tokenInput = document.getElementById("apiToken") as HTMLInputElement;
 const s3Input = document.getElementById("s3Location") as HTMLInputElement;
+const themeLightButton = document.getElementById("themeLight") as HTMLButtonElement;
+const themeDarkButton = document.getElementById("themeDark") as HTMLButtonElement;
 const statusEl = document.getElementById("status") as HTMLParagraphElement;
 const saveButton = document.getElementById("saveSettings") as HTMLButtonElement;
 const resetButton = document.getElementById("resetSettings") as HTMLButtonElement;
@@ -27,10 +36,34 @@ function getForm(): ExtensionSettings {
     };
 }
 
+function setActiveThemeButton(mode: ThemeMode): void {
+    themeLightButton.classList.toggle("active", mode === "light");
+    themeDarkButton.classList.toggle("active", mode === "dark");
+}
+
+async function setTheme(mode: ThemeMode): Promise<void> {
+    applyThemeMode(mode);
+    setActiveThemeButton(mode);
+    await saveThemeMode(mode);
+}
+
 async function load(): Promise<void> {
+    const storedTheme = await getThemeMode();
+    const mode = storedTheme ?? getSystemThemeMode();
+    applyThemeMode(mode);
+    setActiveThemeButton(mode);
+
     const settings = await getSettings();
     setForm(settings);
 }
+
+themeLightButton.addEventListener("click", async () => {
+    await setTheme("light");
+});
+
+themeDarkButton.addEventListener("click", async () => {
+    await setTheme("dark");
+});
 
 saveButton.addEventListener("click", async () => {
     try {

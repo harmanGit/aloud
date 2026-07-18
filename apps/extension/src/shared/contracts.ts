@@ -1,4 +1,6 @@
 export type TriggerSource = "popup" | "context-menu" | "shortcut";
+export type SaveMode = "local" | "cloud";
+export type ThemeMode = "light" | "dark";
 
 export interface ExtensionSettings {
     apiEndpoint: string;
@@ -35,7 +37,7 @@ export interface ApiFailure {
 export type ApiPayload = ApiSuccess | ApiFailure;
 
 export type RuntimeRequest =
-    | { type: "RUN_ACTIVE_TAB"; tabId?: number }
+    | { type: "RUN_ACTIVE_TAB"; tabId?: number; mode?: SaveMode }
     | { type: "EXTRACT_PAGE" }
     | { type: "CONFIRM_DOWNLOAD"; fileName: string; source: string }
     | { type: "SHOW_ALERT"; message: string };

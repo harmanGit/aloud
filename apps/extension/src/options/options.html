@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="common.css" />
 </head>
 
-<body>
+<body class="options-page">
     <main class="panel panel-wide">
         <h1>Aloud Options</h1>
         <p class="hint">Set API endpoint, API token, and optional S3 target used by the extension.</p>
@@ -27,6 +27,14 @@
             S3 Location (Optional)
             <input id="s3Location" type="text" placeholder="s3://bucket/key-prefix" />
         </label>
+
+        <div class="theme-row centered" aria-label="Theme mode">
+            <span class="theme-label">Theme</span>
+            <div class="theme-toggle" role="group" aria-label="Choose theme">
+                <button id="themeLight" type="button" class="theme-button">Light</button>
+                <button id="themeDark" type="button" class="theme-button">Dark</button>
+            </div>
+        </div>
 
         <div class="actions">
             <button id="saveSettings" type="button" class="primary">Save Settings</button>

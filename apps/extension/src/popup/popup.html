@@ -8,33 +8,23 @@
     <link rel="stylesheet" href="common.css" />
 </head>
 
-<body>
+<body class="popup-page">
     <main class="panel">
         <h1>Aloud</h1>
         <p class="hint">Extract readable text from this tab and send it to your API.</p>
 
-        <label>
-            API Endpoint
-            <input id="apiEndpoint" type="url" placeholder="https://api.example.com/convert" />
-        </label>
-
-        <label>
-            API Token
-            <input id="apiToken" type="password" placeholder="Token" />
-        </label>
-
-        <label>
-            S3 Location (Optional)
-            <input id="s3Location" type="text" placeholder="s3://bucket/key-prefix" />
-        </label>
-
-        <div class="actions">
-            <button id="saveSettings" type="button">Save</button>
-            <button id="runNow" type="button" class="primary">Run on This Tab</button>
-        </div>
-
-        <div class="actions">
-            <button id="openOptions" type="button" class="ghost">Open Full Options</button>
+        <div class="actions main-actions">
+            <button id="saveLocal" type="button" class="primary">Save to Local</button>
+            <span id="cloudActionWrap" class="tooltip-wrap">
+                <button id="saveCloud" type="button" aria-describedby="cloudTooltip">Save to Cloud</button>
+                <span id="cloudTooltip" class="tooltip-bubble" role="tooltip">
+                    S3 location must be set in Options to enable Save to Cloud.
+                </span>
+            </span>
+            <button id="openOptions" type="button" class="ghost icon-button" aria-label="Open options"
+                title="Open options">
+                ⚙
+            </button>
         </div>
 
         <p id="status" class="status" aria-live="polite"></p>
