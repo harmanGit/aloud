@@ -7,22 +7,16 @@ import {
 } from "../shared/storage";
 
 const statusEl = document.getElementById("status") as HTMLParagraphElement;
-const saveLocalButton = document.getElementById("saveLocal") as HTMLButtonElement;
-const saveCloudButton = document.getElementById("saveCloud") as HTMLButtonElement;
+const playButton = document.getElementById("playAction") as HTMLButtonElement;
+const saveButton = document.getElementById("saveAction") as HTMLButtonElement;
 const optionsButton = document.getElementById("openOptions") as HTMLButtonElement;
-const cloudActionWrap = document.getElementById("cloudActionWrap") as HTMLSpanElement;
 
 function showStatus(message: string, isError = false): void {
     statusEl.textContent = message;
     statusEl.classList.toggle("error", isError);
 }
 
-function setCloudAvailability(hasS3Location: boolean): void {
-    saveCloudButton.disabled = !hasS3Location;
-    cloudActionWrap.classList.toggle("cloud-disabled", !hasS3Location);
-}
-
-async function runForMode(mode: SaveMode): Promise<void> {
+async function runForMode(mode: SaveMode, localPlay = false): Promise<void> {
     try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tab?.id) {
@@ -34,7 +28,8 @@ async function runForMode(mode: SaveMode): Promise<void> {
         const response = (await chrome.runtime.sendMessage({
             type: "RUN_ACTIVE_TAB",
             tabId: tab.id,
-            mode
+            mode,
+            localPlay
         } as RuntimeRequest)) as RuntimeResponse;
 
         showStatus(response.message, !response.ok);
@@ -43,12 +38,21 @@ async function runForMode(mode: SaveMode): Promise<void> {
     }
 }
 
-saveLocalButton.addEventListener("click", async () => {
-    await runForMode("local");
+playButton.addEventListener("click", async () => {
+    await runForMode("local", true);
 });
 
-saveCloudButton.addEventListener("click", async () => {
-    await runForMode("cloud");
+saveButton.addEventListener("click", async () => {
+    try {
+        const settings = await getSettings();
+        if (settings.saveMode === "cloud" && !settings.s3Location) {
+            showStatus("S3 location is required for Cloud save. Set it in Options.", true);
+            return;
+        }
+        await runForMode(settings.saveMode);
+    } catch (error) {
+        showStatus(error instanceof Error ? error.message : "Save failed.", true);
+    }
 });
 
 optionsButton.addEventListener("click", () => {
@@ -59,9 +63,6 @@ async function init(): Promise<void> {
     const storedTheme = await getThemeMode();
     const mode = storedTheme ?? getSystemThemeMode();
     applyThemeMode(mode);
-
-    const settings = await getSettings();
-    setCloudAvailability(Boolean(settings.s3Location));
 }
 
 init().catch((error) => {

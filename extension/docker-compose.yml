@@ -1,14 +1,14 @@
 services:
   extension-build:
     image: node:20-bookworm-slim
-    working_dir: /workspace/apps/extension
+    working_dir: /workspace
     volumes:
-      - .:/workspace/apps/extension
+      - .:/workspace
     command: sh -lc "npm install && npm run build"
 
   extension-watch:
     image: node:20-bookworm-slim
-    working_dir: /workspace/apps/extension
+    working_dir: /workspace
     volumes:
-      - .:/workspace/apps/extension
+      - .:/workspace
     command: sh -lc "npm install && npm run watch"

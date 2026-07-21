@@ -6,6 +6,7 @@ export interface ExtensionSettings {
     apiEndpoint: string;
     apiToken: string;
     s3Location: string;
+    saveMode: SaveMode;
 }
 
 export interface ExtractionResult {
@@ -37,7 +38,7 @@ export interface ApiFailure {
 export type ApiPayload = ApiSuccess | ApiFailure;
 
 export type RuntimeRequest =
-    | { type: "RUN_ACTIVE_TAB"; tabId?: number; mode?: SaveMode }
+    | { type: "RUN_ACTIVE_TAB"; tabId?: number; mode?: SaveMode; localPlay?: boolean }
     | { type: "EXTRACT_PAGE" }
     | { type: "CONFIRM_DOWNLOAD"; fileName: string; source: string }
     | { type: "SHOW_ALERT"; message: string };
@@ -50,5 +51,6 @@ export interface RuntimeResponse {
 export const DEFAULT_SETTINGS: ExtensionSettings = {
     apiEndpoint: "",
     apiToken: "",
-    s3Location: ""
+    s3Location: "",
+    saveMode: "local"
 };

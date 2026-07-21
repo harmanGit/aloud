@@ -11,6 +11,7 @@ import {
 const endpointInput = document.getElementById("apiEndpoint") as HTMLInputElement;
 const tokenInput = document.getElementById("apiToken") as HTMLInputElement;
 const s3Input = document.getElementById("s3Location") as HTMLInputElement;
+const saveModeInput = document.getElementById("saveMode") as HTMLSelectElement;
 const themeLightButton = document.getElementById("themeLight") as HTMLButtonElement;
 const themeDarkButton = document.getElementById("themeDark") as HTMLButtonElement;
 const statusEl = document.getElementById("status") as HTMLParagraphElement;
@@ -26,13 +27,15 @@ function setForm(settings: ExtensionSettings): void {
     endpointInput.value = settings.apiEndpoint;
     tokenInput.value = settings.apiToken;
     s3Input.value = settings.s3Location;
+    saveModeInput.value = settings.saveMode;
 }
 
 function getForm(): ExtensionSettings {
     return {
         apiEndpoint: endpointInput.value,
         apiToken: tokenInput.value,
-        s3Location: s3Input.value
+        s3Location: s3Input.value,
+        saveMode: saveModeInput.value === "cloud" ? "cloud" : "local"
     };
 }
 

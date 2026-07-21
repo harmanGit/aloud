@@ -2,8 +2,8 @@
 
 This repository is a monorepo with both:
 
-- `apps/extension`: Chrome MV3 extension client.
-- `apps/api`: backend API service (to be implemented).
+- `extension`: Chrome MV3 extension client.
+- `api`: backend API service (to be implemented).
 
 Recommended contract with the extension:
 

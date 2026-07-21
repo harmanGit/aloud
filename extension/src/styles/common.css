@@ -219,6 +219,24 @@ input {
     background: color-mix(in srgb, var(--panel-bg) 92%, white 8%);
 }
 
+select {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 6px;
+    border: 1px solid var(--input-border);
+    border-radius: 10px;
+    padding: 10px 11px;
+    font-size: 13px;
+    color: var(--text-main);
+    background: color-mix(in srgb, var(--panel-bg) 92%, white 8%);
+}
+
+select:focus {
+    outline: 2px solid color-mix(in srgb, var(--accent) 40%, white 60%);
+    border-color: var(--accent);
+}
+
 input:focus {
     outline: 2px solid color-mix(in srgb, var(--accent) 40%, white 60%);
     border-color: var(--accent);
@@ -236,7 +254,7 @@ input:focus {
 
 .main-actions {
     display: grid;
-    grid-template-columns: 1fr 1fr 44px;
+    grid-template-columns: repeat(3, 1fr);
     align-items: center;
     gap: 6px;
 }
@@ -245,22 +263,15 @@ input:focus {
     min-width: 0;
 }
 
-.main-actions>#saveLocal {
+.main-actions>.icon-button {
     width: 100%;
-}
-
-.main-actions>.tooltip-wrap {
-    width: 100%;
-    min-width: 0;
-}
-
-.main-actions>.tooltip-wrap>button {
-    width: 100%;
-    white-space: nowrap;
 }
 
 .main-actions>.icon-button {
-    width: 44px;
+    min-width: 0;
+    font-size: 16px;
+    line-height: 1;
+    padding: 11px 12px;
 }
 
 .theme-row {

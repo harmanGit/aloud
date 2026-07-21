@@ -1,6 +1,6 @@
 FROM node:20-bookworm-slim
 
-WORKDIR /workspace/apps/extension
+WORKDIR /workspace
 
 COPY package*.json ./
 RUN npm install

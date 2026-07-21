@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, type ExtensionSettings, type ThemeMode } from "./contracts";
+import { DEFAULT_SETTINGS, type ExtensionSettings, type SaveMode, type ThemeMode } from "./contracts";
 
 const STORAGE_KEY = "aloud.settings";
 const THEME_KEY = "aloud.theme";
@@ -9,7 +9,8 @@ export async function getSettings(): Promise<ExtensionSettings> {
     return {
         apiEndpoint: (raw.apiEndpoint ?? DEFAULT_SETTINGS.apiEndpoint).trim(),
         apiToken: (raw.apiToken ?? DEFAULT_SETTINGS.apiToken).trim(),
-        s3Location: (raw.s3Location ?? DEFAULT_SETTINGS.s3Location).trim()
+        s3Location: (raw.s3Location ?? DEFAULT_SETTINGS.s3Location).trim(),
+        saveMode: raw.saveMode === "cloud" ? "cloud" : DEFAULT_SETTINGS.saveMode
     };
 }
 
@@ -17,7 +18,8 @@ export async function saveSettings(settings: ExtensionSettings): Promise<void> {
     const sanitized: ExtensionSettings = {
         apiEndpoint: settings.apiEndpoint.trim(),
         apiToken: settings.apiToken.trim(),
-        s3Location: settings.s3Location.trim()
+        s3Location: settings.s3Location.trim(),
+        saveMode: settings.saveMode === "cloud" ? "cloud" : "local"
     };
 
     await chrome.storage.sync.set({ [STORAGE_KEY]: sanitized });

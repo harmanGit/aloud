@@ -10,6 +10,13 @@ import { getSettings } from "../shared/storage";
 
 const CONTEXT_MENU_ID = "aloud-process-current-page";
 
+function buildSynthesisUrl(rawEndpoint: string): string {
+    const normalized = rawEndpoint.trim().replace(/\/+$/, "");
+    return normalized.toLowerCase().endsWith("/synthesis")
+        ? normalized
+        : `${normalized}/synthesis`;
+}
+
 function sanitizeFilename(input: string): string {
     const cleaned = input
         .replace(/[^a-zA-Z0-9 _.-]/g, "")
@@ -22,8 +29,8 @@ function sanitizeFilename(input: string): string {
 function decodeBase64Mp4(base64: string): Blob {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) {
-        bytes[i] = binary.charCodeAt(i);
+    for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index);
     }
     return new Blob([bytes], { type: "video/mp4" });
 }
@@ -63,7 +70,8 @@ async function downloadBlob(blob: Blob, filename: string): Promise<void> {
 
 async function postToApi(
     extraction: NonNullable<ExtractionResponse["data"]>,
-    mode: SaveMode
+    mode: SaveMode,
+    localPlay = false
 ): Promise<Response> {
     const settings = await getSettings();
     if (!settings.apiEndpoint) {
@@ -76,14 +84,21 @@ async function postToApi(
         throw new Error("S3 location is required for Save to Cloud. Set it in options.");
     }
 
+    const textBlocks = extraction.text
+        .split(/\n{2,}/)
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0);
+
     const body = {
-        title: extraction.title,
-        url: extraction.url,
-        text: extraction.text,
-        s3Location: mode === "cloud" ? settings.s3Location : undefined
+        text: textBlocks.length > 0 ? textBlocks : [extraction.text],
+        local_play: localPlay,
+        download: localPlay ? false : mode === "local",
+        delivery: localPlay ? false : mode === "cloud",
+        delivery_url: localPlay ? null : mode === "cloud" ? settings.s3Location : null,
+        delivery_token: null
     };
 
-    return fetch(settings.apiEndpoint, {
+    return fetch(buildSynthesisUrl(settings.apiEndpoint), {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -109,15 +124,15 @@ async function processApiResponse(tabId: number, title: string, response: Respon
 
         if (payload.mediaUrl) {
             const approved = await askForDownloadApproval(tabId, payload.fileName || outputName, "media URL");
-            if (approved) {
-                await chrome.downloads.download({
-                    url: payload.mediaUrl,
-                    filename: payload.fileName || outputName,
-                    saveAs: true
-                });
-                return "Downloaded MP4 from returned media URL.";
+            if (!approved) {
+                return "Download canceled by user.";
             }
-            return "Download canceled by user.";
+            await chrome.downloads.download({
+                url: payload.mediaUrl,
+                filename: payload.fileName || outputName,
+                saveAs: true
+            });
+            return "Downloaded MP4 from returned media URL.";
         }
 
         if (payload.mp4Base64) {
@@ -141,17 +156,22 @@ async function processApiResponse(tabId: number, title: string, response: Respon
     return "Downloaded MP4 file from binary API response.";
 }
 
-async function runPipeline(tabId: number, source: TriggerSource, mode: SaveMode = "local"): Promise<RuntimeResponse> {
+async function runPipeline(
+    tabId: number,
+    source: TriggerSource,
+    mode: SaveMode = "local",
+    localPlay = false
+): Promise<RuntimeResponse> {
     const extraction = await requestExtraction(tabId);
     if (!extraction.ok || !extraction.data) {
         throw new Error(extraction.error || "Extraction failed.");
     }
 
-    const response = await postToApi(extraction.data, mode);
+    const response = await postToApi(extraction.data, mode, localPlay);
     const message = await processApiResponse(tabId, extraction.data.title, response);
     return {
         ok: true,
-        message: `[${source}] [${mode}] ${message}`
+        message: `[${source}] [${mode}${localPlay ? "+play" : ""}] ${message}`
     };
 }
 
@@ -175,6 +195,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     if (info.menuItemId !== CONTEXT_MENU_ID || !tab?.id) {
         return;
     }
+
     try {
         await runPipeline(tab.id, "context-menu", "local");
     } catch (error) {
@@ -186,6 +207,7 @@ chrome.commands.onCommand.addListener(async (command) => {
     if (command !== "run-processing") {
         return;
     }
+
     try {
         const tabId = await getActiveTabId();
         await runPipeline(tabId, "shortcut", "local");
@@ -202,7 +224,12 @@ chrome.runtime.onMessage.addListener((request: RuntimeRequest, _sender, sendResp
     (async () => {
         try {
             const tabId = request.tabId ?? (await getActiveTabId());
-            const result = await runPipeline(tabId, "popup", request.mode ?? "local");
+            const result = await runPipeline(
+                tabId,
+                "popup",
+                request.mode ?? "local",
+                request.localPlay ?? false
+            );
             sendResponse(result);
         } catch (error) {
             const message = error instanceof Error ? error.message : "Unexpected error";

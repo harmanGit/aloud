@@ -16,17 +16,17 @@ From repo root:
 
 ```bash
 docker run --rm \
-  -v "$PWD":/workspace \
-  -w /workspace/apps/extension \
+  -v "$PWD/extension":/workspace \
+  -w /workspace \
   node:20-bookworm-slim \
   sh -lc "npm install && npm run build"
 ```
 
-This keeps installs/artifacts in the repo at `apps/extension/node_modules` and `apps/extension/dist`.
+This keeps installs/artifacts in the repo at `extension/node_modules` and `extension/dist`.
 
 ## Build with Docker Compose
 
-From `apps/extension`:
+From `extension`:
 
 ```bash
 docker compose run --rm extension-build
@@ -43,7 +43,7 @@ docker compose run --rm extension-watch
 1. Open `chrome://extensions`.
 2. Enable Developer mode.
 3. Click Load unpacked.
-4. Select `apps/extension/dist`.
+4. Select `extension/dist`.
 
 ## Expected API contract (MVP)
 
