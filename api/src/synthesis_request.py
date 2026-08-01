@@ -2,6 +2,8 @@ from pydantic import BaseModel
 
 
 class SynthesisRequest(BaseModel):
+    title: str | None = None
+    url: str | None = None
     text: str | list[str]
     local_play: bool = False
     download: bool = False

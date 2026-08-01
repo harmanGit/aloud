@@ -27,6 +27,8 @@ export interface ApiSuccess {
     message?: string;
     mediaUrl?: string;
     mp4Base64?: string;
+    audioBase64?: string;
+    mimeType?: string;
     fileName?: string;
 }
 
@@ -37,10 +39,24 @@ export interface ApiFailure {
 
 export type ApiPayload = ApiSuccess | ApiFailure;
 
+export interface CachedAudio {
+    audioBase64: string;
+    mimeType: string;
+    fileName: string;
+}
+
 export type RuntimeRequest =
     | { type: "RUN_ACTIVE_TAB"; tabId?: number; mode?: SaveMode; localPlay?: boolean }
     | { type: "EXTRACT_PAGE" }
+    | { type: "GET_CACHED_AUDIO" }
     | { type: "CONFIRM_DOWNLOAD"; fileName: string; source: string }
+    | {
+        type: "PLAY_AUDIO";
+        audioBase64?: string;
+        audioUrl?: string;
+        mimeType?: string;
+        fileName?: string;
+    }
     | { type: "SHOW_ALERT"; message: string };
 
 export interface RuntimeResponse {

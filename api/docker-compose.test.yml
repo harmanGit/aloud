@@ -1,0 +1,7 @@
+services:
+  api-test:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    command: ["pytest", "-q", "test"]

@@ -7,13 +7,21 @@ import {
 } from "../shared/storage";
 
 const statusEl = document.getElementById("status") as HTMLParagraphElement;
+const spinnerEl = document.getElementById("spinner") as HTMLSpanElement;
 const playButton = document.getElementById("playAction") as HTMLButtonElement;
 const saveButton = document.getElementById("saveAction") as HTMLButtonElement;
 const optionsButton = document.getElementById("openOptions") as HTMLButtonElement;
 
 function showStatus(message: string, isError = false): void {
+    spinnerEl.hidden = true;
     statusEl.textContent = message;
     statusEl.classList.toggle("error", isError);
+}
+
+function showSynthesising(): void {
+    spinnerEl.hidden = false;
+    statusEl.textContent = "Synthesising";
+    statusEl.classList.remove("error");
 }
 
 async function runForMode(mode: SaveMode, localPlay = false): Promise<void> {
@@ -24,7 +32,7 @@ async function runForMode(mode: SaveMode, localPlay = false): Promise<void> {
             return;
         }
 
-        showStatus("Running...");
+        showSynthesising();
         const response = (await chrome.runtime.sendMessage({
             type: "RUN_ACTIVE_TAB",
             tabId: tab.id,

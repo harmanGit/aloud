@@ -12,3 +12,13 @@ Recommended contract with the extension:
   - JSON with `mediaUrl`, or
   - JSON with `mp4Base64`, or
   - Binary `video/mp4` response.
+
+## Run Unit Tests In Docker
+
+From the `api` directory:
+
+```bash
+docker compose -f docker-compose.test.yml run --rm api-test
+```
+
+This uses the dedicated unit-test image defined in `Dockerfile.test` and keeps test execution fully containerized.

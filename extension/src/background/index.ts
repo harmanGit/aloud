@@ -1,5 +1,6 @@
 import type {
     ApiPayload,
+    CachedAudio,
     ExtractionResponse,
     RuntimeRequest,
     RuntimeResponse,
@@ -9,6 +10,39 @@ import type {
 import { getSettings } from "../shared/storage";
 
 const CONTEXT_MENU_ID = "aloud-process-current-page";
+
+function isMissingReceiverError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+        return false;
+    }
+    return error.message.includes("Receiving end does not exist");
+}
+
+function isRestrictedTabUrl(url?: string): boolean {
+    if (!url) {
+        return false;
+    }
+    return (
+        url.startsWith("chrome://") ||
+        url.startsWith("chrome-extension://") ||
+        url.startsWith("edge://") ||
+        url.startsWith("about:")
+    );
+}
+
+async function ensureContentScriptReady(tabId: number): Promise<void> {
+    const tab = await chrome.tabs.get(tabId);
+    if (isRestrictedTabUrl(tab.url)) {
+        throw new Error(
+            "This tab does not allow extension content scripts. Open a normal http/https page and try again."
+        );
+    }
+
+    await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["content.js"]
+    });
+}
 
 function buildSynthesisUrl(rawEndpoint: string): string {
     const normalized = rawEndpoint.trim().replace(/\/+$/, "");
@@ -26,19 +60,53 @@ function sanitizeFilename(input: string): string {
     return cleaned || "aloud-output";
 }
 
-function decodeBase64Mp4(base64: string): Blob {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) {
-        bytes[index] = binary.charCodeAt(index);
+function extensionForMimeType(mimeType: string): string {
+    if (mimeType.includes("wav")) {
+        return "wav";
     }
-    return new Blob([bytes], { type: "video/mp4" });
+    if (mimeType.includes("mpeg") || mimeType.includes("mp3")) {
+        return "mp3";
+    }
+    if (mimeType.includes("mp4")) {
+        return "mp4";
+    }
+    return "bin";
+}
+
+async function blobToBase64(blob: Blob): Promise<string> {
+    const buffer = await blob.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (const byte of bytes) {
+        binary += String.fromCharCode(byte);
+    }
+    return btoa(binary);
+}
+
+async function getCachedAudio(tabId: number): Promise<CachedAudio | null> {
+    try {
+        const response = await chrome.tabs.sendMessage(tabId, { type: "GET_CACHED_AUDIO" } as RuntimeRequest);
+        return response?.ok && response.data ? (response.data as CachedAudio) : null;
+    } catch {
+        return null;
+    }
 }
 
 async function requestExtraction(tabId: number): Promise<ExtractionResponse> {
-    return (await chrome.tabs.sendMessage(tabId, {
-        type: "EXTRACT_PAGE"
-    } as RuntimeRequest)) as ExtractionResponse;
+    try {
+        return (await chrome.tabs.sendMessage(tabId, {
+            type: "EXTRACT_PAGE"
+        } as RuntimeRequest)) as ExtractionResponse;
+    } catch (error) {
+        if (!isMissingReceiverError(error)) {
+            throw error;
+        }
+
+        await ensureContentScriptReady(tabId);
+        return (await chrome.tabs.sendMessage(tabId, {
+            type: "EXTRACT_PAGE"
+        } as RuntimeRequest)) as ExtractionResponse;
+    }
 }
 
 async function askForDownloadApproval(
@@ -58,15 +126,33 @@ async function askForDownloadApproval(
     }
 }
 
-async function downloadBlob(blob: Blob, filename: string): Promise<void> {
-    const objectUrl = URL.createObjectURL(blob);
-    await chrome.downloads.download({
-        url: objectUrl,
-        filename,
-        saveAs: true
-    });
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+async function playAudioInTab(
+    tabId: number,
+    audioSource: { audioBase64?: string; audioUrl?: string; mimeType?: string; fileName?: string }
+): Promise<boolean> {
+    try {
+        const response = (await chrome.tabs.sendMessage(tabId, {
+            type: "PLAY_AUDIO",
+            ...audioSource
+        } as RuntimeRequest)) as RuntimeResponse;
+        return response.ok;
+    } catch (error) {
+        if (isMissingReceiverError(error)) {
+            try {
+                await ensureContentScriptReady(tabId);
+                const retried = (await chrome.tabs.sendMessage(tabId, {
+                    type: "PLAY_AUDIO",
+                    ...audioSource
+                } as RuntimeRequest)) as RuntimeResponse;
+                return retried.ok;
+            } catch {
+                return false;
+            }
+        }
+        return false;
+    }
 }
+
 
 async function postToApi(
     extraction: NonNullable<ExtractionResponse["data"]>,
@@ -90,6 +176,8 @@ async function postToApi(
         .filter((part) => part.length > 0);
 
     const body = {
+        title: extraction.title,
+        url: extraction.url,
         text: textBlocks.length > 0 ? textBlocks : [extraction.text],
         local_play: localPlay,
         download: localPlay ? false : mode === "local",
@@ -108,13 +196,19 @@ async function postToApi(
     });
 }
 
-async function processApiResponse(tabId: number, title: string, response: Response): Promise<string> {
+async function processApiResponse(
+    tabId: number,
+    title: string,
+    response: Response,
+    localPlay = false
+): Promise<string> {
     if (!response.ok) {
         throw new Error(`API call failed with status ${response.status}.`);
     }
 
     const contentType = response.headers.get("content-type") ?? "";
-    const outputName = `${sanitizeFilename(title)}.mp4`;
+    const binaryExtension = extensionForMimeType(contentType);
+    const outputName = `${sanitizeFilename(title)}.${binaryExtension}`;
 
     if (contentType.includes("application/json")) {
         const payload = (await response.json()) as ApiPayload;
@@ -123,6 +217,17 @@ async function processApiResponse(tabId: number, title: string, response: Respon
         }
 
         if (payload.mediaUrl) {
+            if (localPlay) {
+                const played = await playAudioInTab(tabId, {
+                    audioUrl: payload.mediaUrl,
+                    mimeType: payload.mimeType,
+                    fileName: payload.fileName || outputName
+                });
+                if (played) {
+                    return "Playing synthesized audio in page player.";
+                }
+            }
+
             const approved = await askForDownloadApproval(tabId, payload.fileName || outputName, "media URL");
             if (!approved) {
                 return "Download canceled by user.";
@@ -136,24 +241,84 @@ async function processApiResponse(tabId: number, title: string, response: Respon
         }
 
         if (payload.mp4Base64) {
+            if (localPlay) {
+                const played = await playAudioInTab(tabId, {
+                    audioBase64: payload.mp4Base64,
+                    mimeType: "video/mp4",
+                    fileName: payload.fileName || outputName
+                });
+                if (played) {
+                    return "Playing synthesized audio in page player.";
+                }
+            }
+
             const approved = await askForDownloadApproval(tabId, payload.fileName || outputName, "base64 payload");
             if (!approved) {
                 return "Download canceled by user.";
             }
-            await downloadBlob(decodeBase64Mp4(payload.mp4Base64), payload.fileName || outputName);
+            await chrome.downloads.download({
+                url: `data:video/mp4;base64,${payload.mp4Base64}`,
+                filename: payload.fileName || outputName,
+                saveAs: true
+            });
             return "Downloaded MP4 file from API response.";
+        }
+
+        if (payload.audioBase64) {
+            const mimeType = payload.mimeType || "audio/wav";
+            const extension = extensionForMimeType(mimeType);
+            const fallbackName = `${sanitizeFilename(title)}.${extension}`;
+
+            if (localPlay) {
+                const played = await playAudioInTab(tabId, {
+                    audioBase64: payload.audioBase64,
+                    mimeType,
+                    fileName: payload.fileName || fallbackName
+                });
+                if (played) {
+                    return "Playing synthesized audio in page player.";
+                }
+            }
+
+            const approved = await askForDownloadApproval(tabId, payload.fileName || fallbackName, "audio payload");
+            if (!approved) {
+                return "Download canceled by user.";
+            }
+            await chrome.downloads.download({
+                url: `data:${mimeType};base64,${payload.audioBase64}`,
+                filename: payload.fileName || fallbackName,
+                saveAs: true
+            });
+            return "Downloaded synthesized English audio file.";
         }
 
         return payload.message || "API call succeeded.";
     }
 
     const binaryBlob = await response.blob();
+    const binaryBase64 = await blobToBase64(binaryBlob);
+
+    if (localPlay) {
+        const played = await playAudioInTab(tabId, {
+            audioBase64: binaryBase64,
+            mimeType: contentType || "audio/wav",
+            fileName: outputName
+        });
+        if (played) {
+            return "Playing synthesized audio in page player.";
+        }
+    }
+
     const approved = await askForDownloadApproval(tabId, outputName, "binary response");
     if (!approved) {
         return "Download canceled by user.";
     }
-    await downloadBlob(binaryBlob, outputName);
-    return "Downloaded MP4 file from binary API response.";
+    await chrome.downloads.download({
+        url: `data:${contentType || "application/octet-stream"};base64,${binaryBase64}`,
+        filename: outputName,
+        saveAs: true
+    });
+    return "Downloaded file from binary API response.";
 }
 
 async function runPipeline(
@@ -162,13 +327,28 @@ async function runPipeline(
     mode: SaveMode = "local",
     localPlay = false
 ): Promise<RuntimeResponse> {
+    if (localPlay) {
+        const cached = await getCachedAudio(tabId);
+        if (cached) {
+            const played = await playAudioInTab(tabId, cached);
+            if (played) {
+                return { ok: true, message: `[${source}] Replaying cached audio.` };
+            }
+        }
+    }
+
     const extraction = await requestExtraction(tabId);
     if (!extraction.ok || !extraction.data) {
         throw new Error(extraction.error || "Extraction failed.");
     }
 
     const response = await postToApi(extraction.data, mode, localPlay);
-    const message = await processApiResponse(tabId, extraction.data.title, response);
+    const message = await processApiResponse(
+        tabId,
+        extraction.data.title,
+        response,
+        localPlay
+    );
     return {
         ok: true,
         message: `[${source}] [${mode}${localPlay ? "+play" : ""}] ${message}`
@@ -221,7 +401,9 @@ chrome.runtime.onMessage.addListener((request: RuntimeRequest, _sender, sendResp
         return;
     }
 
-    (async () => {
+    // Hold a Web Lock for the duration of synthesis so Chrome does not kill the
+    // service worker if the popup closes before the API response arrives.
+    navigator.locks.request("aloud-synthesis", async () => {
         try {
             const tabId = request.tabId ?? (await getActiveTabId());
             const result = await runPipeline(
@@ -235,7 +417,7 @@ chrome.runtime.onMessage.addListener((request: RuntimeRequest, _sender, sendResp
             const message = error instanceof Error ? error.message : "Unexpected error";
             sendResponse({ ok: false, message });
         }
-    })();
+    });
 
     return true;
 });
