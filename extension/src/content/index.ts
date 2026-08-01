@@ -237,7 +237,7 @@ async function playAudioInPage(request: RuntimeRequest): Promise<ExtractionRespo
     }
 
     const mimeType = request.mimeType || "audio/wav";
-    const label = request.fileName || "Generated audio";
+    const label = (request.fileName || "Generated audio").replace(/\.[^.]+$/, "");
 
     let generatedObjectUrl: string | null = null;
     let sourceUrl: string;

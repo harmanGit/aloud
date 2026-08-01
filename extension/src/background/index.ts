@@ -56,6 +56,7 @@ function sanitizeFilename(input: string): string {
         .replace(/[^a-zA-Z0-9 _.-]/g, "")
         .trim()
         .replace(/\s+/g, "-")
+        .replace(/-{2,}/g, "-")
         .slice(0, 80);
     return cleaned || "aloud-output";
 }

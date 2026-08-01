@@ -1,7 +1,6 @@
 import type { RuntimeRequest, RuntimeResponse, SaveMode } from "../shared/contracts";
 import {
     applyThemeMode,
-    getSettings,
     getSystemThemeMode,
     getThemeMode
 } from "../shared/storage";
@@ -51,16 +50,7 @@ playButton.addEventListener("click", async () => {
 });
 
 saveButton.addEventListener("click", async () => {
-    try {
-        const settings = await getSettings();
-        if (settings.saveMode === "cloud" && !settings.s3Location) {
-            showStatus("S3 location is required for Cloud save. Set it in Options.", true);
-            return;
-        }
-        await runForMode(settings.saveMode);
-    } catch (error) {
-        showStatus(error instanceof Error ? error.message : "Save failed.", true);
-    }
+    await runForMode("local");
 });
 
 optionsButton.addEventListener("click", () => {

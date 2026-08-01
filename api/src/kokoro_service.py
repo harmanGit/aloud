@@ -96,6 +96,7 @@ def build_output_filename(title: str | None, extension: str = "wav") -> str:
 
     cleaned = re.sub(r"[^a-zA-Z0-9 _.-]", "", title)
     cleaned = re.sub(r"\s+", "-", cleaned.strip())
+    cleaned = re.sub(r"-{2,}", "-", cleaned)
     cleaned = cleaned[:80]
     if not cleaned:
         cleaned = "aloud-output"
